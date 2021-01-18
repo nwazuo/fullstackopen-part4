@@ -1,3 +1,6 @@
+const sortBy = require('lodash/sortBy');
+const countBy = require('lodash/countBy');
+
 const dummy = (blogs) => {
     return 1;
 }
@@ -20,6 +23,22 @@ const favoriteBlog = (blogs) => {
     return result
 }
 
+const mostBlogs = (blogs) => {
+    if(!blogs || blogs.length === 0) {
+        return null
+    } 
+
+    let freqMap = countBy(blogs, (blog) => blog.author);
+    let keysSorted = Object.keys(freqMap).sort((a, b) => freqMap[a] - freqMap[b]);
+
+    let result = {
+        author: keysSorted[keysSorted.length - 1],
+        blogs: freqMap[keysSorted[keysSorted.length - 1]]
+    }
+
+    return result;
+}
+
 module.exports = {
-    dummy, totalLikes, favoriteBlog
+    dummy, totalLikes, favoriteBlog, mostBlogs
 }

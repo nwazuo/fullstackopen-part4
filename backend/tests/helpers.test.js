@@ -1,4 +1,5 @@
 const listHelper = require('../utils/list_helper')
+const mostBlogs = require('../utils/list_helper').mostBlogs;
 
 const totalLikes = listHelper.totalLikes
 const favoriteBlog = listHelper.favoriteBlog
@@ -32,7 +33,7 @@ describe('total likes', () => {
 })
 
 describe('favorites', () => {
-  test('witn an empty list is null', () => {
+  test('with an empty list is null', () => {
     expect(favoriteBlog([])).toBe(null);
   })
 
@@ -47,4 +48,18 @@ describe('favorites', () => {
   test('list with multiple blogs is calculated right', () => {
     expect(favoriteBlog(blogs)).toEqual(blogs[2]);
   })
+})
+
+describe.only('most blogs', () => {
+    test(' with empty blog list returns null', () => {
+        expect(mostBlogs()).toBe(null);
+    })
+
+    test(' list with one blog returns the author and blogs count', () => {
+        expect(mostBlogs([blogs[0]])).toEqual({author: "Michael Chan", blogs: 1});
+    })
+
+    test('list with multiple blogs returns author with highest blogs', () => {
+        expect(mostBlogs(blogs)).toEqual({author: 'Robert C. Martin', blogs: 3 })
+    })
 })
