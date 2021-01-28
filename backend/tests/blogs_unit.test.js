@@ -50,7 +50,7 @@ describe('favorites', () => {
   })
 })
 
-describe.only('most blogs', () => {
+describe('most blogs', () => {
     test(' with empty blog list returns null', () => {
         expect(mostBlogs()).toBe(null);
     })
