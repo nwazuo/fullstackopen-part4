@@ -42,7 +42,7 @@ test('blog entries can be created', async () => {
 test('missing likes field defaults to 0', async () => {
     const sampleBlog = { _id: "41224d776a326fb40f000001", title: "On Reading Documentation", author: "Chizo C. Nwazuo", url: "http://chizo.me", __v: 0 }
 
-    await api.post('/api/blogs').send(sampleBlog).expect(201).expect('Content-Type', /application\/json/)
+    let savedBlog = await api.post('/api/blogs').send(sampleBlog).expect(201).expect('Content-Type', /application\/json/)
 
     let response = await api.get(`/api/blogs/${sampleBlog._id}`);
     let content = response.body;
@@ -67,7 +67,7 @@ test('delete request deletes resource', async () => {
     expect(getNotes.body).toHaveLength(initialBlogs.length - 1);
 })
 
-test.only('blog entry can be updated with new values', async () => {
+test('blog entry can be updated with new values', async () => {
     const update = {
         title: 'Something to be updated',
         author: 'Chizo Nwazuo'
@@ -78,6 +78,17 @@ test.only('blog entry can be updated with new values', async () => {
 
     expect(result.body.title).toContain('Something to be updated');
 
+})
+
+test.only('newly created blog has user details', async () => {
+    const newBlog = { _id: "5a422bc61b54a676234d17fc", title: "Type wars", author: "Robert C. Martin", url: "http://blog.cleancoder.com/uncle-bob/2016/05/01/TypeWars.html", likes: 2, __v: 0 };
+
+    await api.post('/api/blogs').send(newBlog).expect(201).expect('Content-Type', /application\/json/);
+
+    let savedBlog = await api.get(`/api/blogs/${newBlog._id}`);
+    console.log('coming thru -->', savedBlog.body);
+
+    expect(savedBlog.body.user).toBeTruthy();
 })
 
 afterAll(() => {
