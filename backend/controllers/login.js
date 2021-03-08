@@ -4,6 +4,7 @@ const User = require('../models/users');
 const loginRouter = require('express').Router();
 
 loginRouter.post('/', async (request, response) => {
+    console.log('Hey I got here 1')
     const body = request.body;
 
     const user = await User.findOne({ username: body.username });
@@ -11,7 +12,7 @@ loginRouter.post('/', async (request, response) => {
     const passwordFound = user === null ? false : await bcrypt.compare(body.password, user.passwordHash);
 
     if (!(user && passwordFound)) {
-        return res.json({ error: 'Invalid user credentials' }).status(401);
+        return response.json({ error: 'Invalid user credentials' }).status(401);
     }
 
     const userCredentials = {
@@ -22,7 +23,8 @@ loginRouter.post('/', async (request, response) => {
     const token = jwt.sign(userCredentials, process.env.SECRET);
 
 
-    response.json({
+    console.log('hey I got here 2');
+    return response.json({
         username: user.username,
         name: user.name,
         token

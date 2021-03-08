@@ -19,13 +19,7 @@ blogsRouter.get('/:id', async (request, response) => {
     response.json(blog);
 })
 
-blogsRouter.post('/', async (request, response) => {
-
-    if (!request.body.title || !request.body.url) {
-        response.status(400).json({ error: 'Blog title or URL missing from request' });
-        return;
-    }
-
+const verifyUserToken = async (request, response, next) => {
     let token = request.token;
 
     if (!token) {
@@ -38,6 +32,21 @@ blogsRouter.post('/', async (request, response) => {
 
     if (!user) {
         return response.json({ error: 'user not found' }).status(400);
+    }
+    request.userInfo = {
+        user, userCredentials
+    };
+
+    next();
+}
+
+blogsRouter.post('/', verifyUserToken, async (request, response) => {
+
+    let { user, userCredentials } = request.userInfo;
+
+    if (!request.body.title || !request.body.url) {
+        response.status(400).json({ error: 'Blog title or URL missing from request' });
+        return;
     }
 
     const newBlog = {

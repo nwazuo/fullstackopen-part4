@@ -8,6 +8,19 @@ const Blog = require('../models/blogs');
 const initialBlogs = [{ _id: "5a422a851b54a676234d17f7", title: "React patterns", author: "Michael Chan", url: "https://reactpatterns.com/", likes: 7, __v: 0 }, { _id: "5a422aa71b54a676234d17f8", title: "Go To Statement Considered Harmful", author: "Edsger W. Dijkstra", url: "http://www.u.arizona.edu/~rubinson/copyright_violations/Go_To_Considered_Harmful.html", likes: 5, __v: 0 }
 ]
 
+const hook = (method = 'post', URL, TOKEN) => api[method](URL).set('Authorization', `Bearer ${TOKEN}`);
+
+// might not be needing this
+/*
+const request = {
+    post: hook('post'),
+    get: hook('get'),
+    put: hook('put'),
+    delete: hook('delete'),
+};
+
+*/
+
 beforeEach(async () => {
     await Blog.deleteMany({});
     for (blog of initialBlogs) {
@@ -25,70 +38,89 @@ test('id property is present in returned object', async () => {
     expect(returnObj.body[0].id).toBeDefined();
 })
 
-test('blog entries can be created', async () => {
-    const newBlog = { _id: "5a422bc61b54a676234d17fc", title: "Type wars", author: "Robert C. Martin", url: "http://blog.cleancoder.com/uncle-bob/2016/05/01/TypeWars.html", likes: 2, __v: 0 };
+// to do: when token is not provided, request returns appropriate status code
 
-    await api.post('/api/blogs').send(newBlog).expect(201).expect('Content-Type', /application\/json/)
 
-    let response = await api.get('/api/blogs');
+describe('when user is authenticated', () => {
+    let loginToken;
 
-    let content = response.body.map(r => r.title)
+    beforeAll(async () => {
+        let userCred = {
+            username: 'chizonwazuo',
+            password: 'themanofwar'
+        }
 
-    expect(content).toHaveLength(initialBlogs.length + 1);
 
-    expect(content).toContain('Type wars');
-})
+        loginToken = (await api.post('/api/users').send(userCred)).body.token;
 
-test('missing likes field defaults to 0', async () => {
-    const sampleBlog = { _id: "41224d776a326fb40f000001", title: "On Reading Documentation", author: "Chizo C. Nwazuo", url: "http://chizo.me", __v: 0 }
+        console.log('Login token ==>', loginToken);
+    })
 
-    let savedBlog = await api.post('/api/blogs').send(sampleBlog).expect(201).expect('Content-Type', /application\/json/)
+    test.only('blog entries can be created', async () => {
+        const newBlog = { title: "Type wars", author: "Robert C. Martin", url: "http://blog.cleancoder.com/uncle-bob/2016/05/01/TypeWars.html", likes: 2, __v: 0 };
 
-    let response = await api.get(`/api/blogs/${sampleBlog._id}`);
-    let content = response.body;
+        await hook('post', '/api/blogs', loginToken).send(newBlog).expect(201).expect('Content-Type', /application\/json/)
 
-    expect(content.title).toContain('Reading Documentation');
+        let response = await api.get('/api/blogs');
 
-    expect(content.likes).toBe(0);
+        let content = response.body.map(r => r.title)
 
-})
+        expect(content).toHaveLength(initialBlogs.length + 1);
 
-test('missing title or url field returns bad request', async () => {
-    const sampleBlog = { _id: "303030303030303030303030", author: "Marijn Haverbeke" }
+        expect(content).toContain('Type wars');
+    })
 
-    await api.post('/api/blogs').send(sampleBlog).expect(400);
-})
+    test('missing likes field defaults to 0', async () => {
+        const sampleBlog = { _id: "41224d776a326fb40f000001", title: "On Reading Documentation", author: "Chizo C. Nwazuo", url: "http://chizo.me", __v: 0 }
 
-test('delete request deletes resource', async () => {
-    const toBeDeletedId = '5a422a851b54a676234d17f7';
-    await api.delete(`/api/blogs/${toBeDeletedId}`).expect(204);
+        let savedBlog = await api.post('/api/blogs').send(sampleBlog).expect(201).expect('Content-Type', /application\/json/)
 
-    let getNotes = await api.get('/api/blogs');
-    expect(getNotes.body).toHaveLength(initialBlogs.length - 1);
-})
+        let response = await api.get(`/api/blogs/${sampleBlog._id}`);
+        let content = response.body;
 
-test('blog entry can be updated with new values', async () => {
-    const update = {
-        title: 'Something to be updated',
-        author: 'Chizo Nwazuo'
-    }
-    const id = '5a422a851b54a676234d17f7';
+        expect(content.title).toContain('Reading Documentation');
 
-    let result = await api.put(`/api/blogs/${id}`).send(update);
+        expect(content.likes).toBe(0);
 
-    expect(result.body.title).toContain('Something to be updated');
+    })
 
-})
+    test('missing title or url field returns bad request', async () => {
+        const sampleBlog = { _id: "303030303030303030303030", author: "Marijn Haverbeke" }
 
-test.only('newly created blog has user details', async () => {
-    const newBlog = { _id: "5a422bc61b54a676234d17fc", title: "Type wars", author: "Robert C. Martin", url: "http://blog.cleancoder.com/uncle-bob/2016/05/01/TypeWars.html", likes: 2, __v: 0 };
+        await api.post('/api/blogs').send(sampleBlog).expect(400);
+    })
 
-    await api.post('/api/blogs').send(newBlog).expect(201).expect('Content-Type', /application\/json/);
+    test('delete request deletes resource', async () => {
+        const toBeDeletedId = '5a422a851b54a676234d17f7';
+        await api.delete(`/api/blogs/${toBeDeletedId}`).expect(204);
 
-    let savedBlog = await api.get(`/api/blogs/${newBlog._id}`);
-    console.log('coming thru -->', savedBlog.body);
+        let getNotes = await api.get('/api/blogs');
+        expect(getNotes.body).toHaveLength(initialBlogs.length - 1);
+    })
 
-    expect(savedBlog.body.user).toBeTruthy();
+    test('blog entry can be updated with new values', async () => {
+        const update = {
+            title: 'Something to be updated',
+            author: 'Chizo Nwazuo'
+        }
+        const id = '5a422a851b54a676234d17f7';
+
+        let result = await api.put(`/api/blogs/${id}`).send(update);
+
+        expect(result.body.title).toContain('Something to be updated');
+
+    })
+
+    test('newly created blog has user details', async () => {
+        const newBlog = { _id: "5a422bc61b54a676234d17fc", title: "Type wars", author: "Robert C. Martin", url: "http://blog.cleancoder.com/uncle-bob/2016/05/01/TypeWars.html", likes: 2, __v: 0 };
+
+        await api.post('/api/blogs').send(newBlog).expect(201).expect('Content-Type', /application\/json/);
+
+        let savedBlog = await api.get(`/api/blogs/${newBlog._id}`);
+        console.log('coming thru -->', savedBlog.body);
+
+        expect(savedBlog.body.user).toBeTruthy();
+    })
 })
 
 afterAll(() => {
