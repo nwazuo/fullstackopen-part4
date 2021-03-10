@@ -4,23 +4,25 @@ const app = require('../app');
 const api = supertest(app);
 
 const Blog = require('../models/blogs');
+const helper = require('../utils/blogs_helper');
 
 const initialBlogs = [{ _id: "5a422a851b54a676234d17f7", title: "React patterns", author: "Michael Chan", url: "https://reactpatterns.com/", likes: 7, __v: 0 }, { _id: "5a422aa71b54a676234d17f8", title: "Go To Statement Considered Harmful", author: "Edsger W. Dijkstra", url: "http://www.u.arizona.edu/~rubinson/copyright_violations/Go_To_Considered_Harmful.html", likes: 5, __v: 0 }
 ]
 
-const hook = (method = 'post', URL, TOKEN) => api[method](URL).set('Authorization', `Bearer ${TOKEN}`);
+const authReq = (method = 'post', URL, TOKEN) => api[method](URL).set('Authorization', `Bearer ${TOKEN}`);
 
 // might not be needing this
 /*
 const request = {
-    post: hook('post'),
-    get: hook('get'),
-    put: hook('put'),
-    delete: hook('delete'),
+    post: authReq('post'),
+    get: authReq('get'),
+    put: authReq('put'),
+    delete: authReq('delete'),
 };
 
 */
 
+// initialize test database with  initial test data
 beforeEach(async () => {
     await Blog.deleteMany({});
     for (blog of initialBlogs) {
@@ -38,12 +40,21 @@ test('id property is present in returned object', async () => {
     expect(returnObj.body[0].id).toBeDefined();
 })
 
-// to do: when token is not provided, request returns appropriate status code
+
+test('adding a blog fails with status 401 if token is not provided', async () => {
+    let newBlog = {
+        title: 'The fall of man',
+        url: 'Genesis.com'
+    }
+
+    await api.post('/api/blogs').send(newBlog).expect(401);
+})
 
 
 describe('when user is authenticated', () => {
     let loginToken;
 
+    // generate login token for tests that require it
     beforeAll(async () => {
         let userCred = {
             username: 'chizonwazuo',
@@ -52,14 +63,12 @@ describe('when user is authenticated', () => {
 
 
         loginToken = (await api.post('/api/users').send(userCred)).body.token;
-
-        console.log('Login token ==>', loginToken);
     })
 
-    test.only('blog entries can be created', async () => {
+    test('blog entries can be created', async () => {
         const newBlog = { title: "Type wars", author: "Robert C. Martin", url: "http://blog.cleancoder.com/uncle-bob/2016/05/01/TypeWars.html", likes: 2, __v: 0 };
 
-        await hook('post', '/api/blogs', loginToken).send(newBlog).expect(201).expect('Content-Type', /application\/json/)
+        await authReq('post', '/api/blogs', loginToken).send(newBlog).expect(201).expect('Content-Type', /application\/json/)
 
         let response = await api.get('/api/blogs');
 
@@ -71,11 +80,11 @@ describe('when user is authenticated', () => {
     })
 
     test('missing likes field defaults to 0', async () => {
-        const sampleBlog = { _id: "41224d776a326fb40f000001", title: "On Reading Documentation", author: "Chizo C. Nwazuo", url: "http://chizo.me", __v: 0 }
+        const sampleBlog = { title: "On Reading Documentation", url: "http://chizo.me", __v: 0 }
 
-        let savedBlog = await api.post('/api/blogs').send(sampleBlog).expect(201).expect('Content-Type', /application\/json/)
+        let blog = await authReq('post', '/api/blogs', loginToken).send(sampleBlog).expect(201).expect('Content-Type', /application\/json/)
 
-        let response = await api.get(`/api/blogs/${sampleBlog._id}`);
+        let response = await api.get(`/api/blogs/${blog.body.id}`);
         let content = response.body;
 
         expect(content.title).toContain('Reading Documentation');
@@ -87,37 +96,51 @@ describe('when user is authenticated', () => {
     test('missing title or url field returns bad request', async () => {
         const sampleBlog = { _id: "303030303030303030303030", author: "Marijn Haverbeke" }
 
-        await api.post('/api/blogs').send(sampleBlog).expect(400);
+        await authReq('post', '/api/blogs', loginToken).send(sampleBlog).expect(400);
     })
 
     test('delete request deletes resource', async () => {
-        const toBeDeletedId = '5a422a851b54a676234d17f7';
-        await api.delete(`/api/blogs/${toBeDeletedId}`).expect(204);
+        const blogsAtStart = await helper.blogsInDB();
 
-        let getNotes = await api.get('/api/blogs');
-        expect(getNotes.body).toHaveLength(initialBlogs.length - 1);
+        const sampleBlog = {
+            title: "The greatest coder ever liveth",
+            url: "chizo.me/codoo"
+        }
+
+        const toBeDeletedId = (await authReq('post', '/api/blogs', loginToken).send(sampleBlog)).body.id;
+
+        console.log('==> to be deleted', toBeDeletedId);
+
+        await authReq('delete', `/api/blogs/${toBeDeletedId}`, loginToken).expect(204);
+
+        let getAllNotes = await api.get('/api/blogs');
+        expect(getAllNotes.body).toHaveLength(blogsAtStart.length);
     })
 
     test('blog entry can be updated with new values', async () => {
-        const update = {
-            title: 'Something to be updated',
-            author: 'Chizo Nwazuo'
-        }
-        const id = '5a422a851b54a676234d17f7';
 
-        let result = await api.put(`/api/blogs/${id}`).send(update);
+        const sampleBlog = {
+            title: "The greatest coder ever liveth",
+            url: "chizo.me/codoo"
+        }
+
+        const testDocumentId = (await authReq('post', '/api/blogs', loginToken).send(sampleBlog)).body.id;
+
+        const update = {
+            title: "Something to be updated",
+            url: "chizo.me/hanoi"
+        }
+
+        let result = await authReq('put', `/api/blogs/${testDocumentId}`, loginToken).send(update);
 
         expect(result.body.title).toContain('Something to be updated');
 
     })
 
     test('newly created blog has user details', async () => {
-        const newBlog = { _id: "5a422bc61b54a676234d17fc", title: "Type wars", author: "Robert C. Martin", url: "http://blog.cleancoder.com/uncle-bob/2016/05/01/TypeWars.html", likes: 2, __v: 0 };
+        const newBlog = { title: "Type wars", author: "Robert C. Martin", url: "http://blog.cleancoder.com/uncle-bob/2016/05/01/TypeWars.html", likes: 2, __v: 0 };
 
-        await api.post('/api/blogs').send(newBlog).expect(201).expect('Content-Type', /application\/json/);
-
-        let savedBlog = await api.get(`/api/blogs/${newBlog._id}`);
-        console.log('coming thru -->', savedBlog.body);
+        let savedBlog = (await authReq('post', '/api/blogs', loginToken).send(newBlog));
 
         expect(savedBlog.body.user).toBeTruthy();
     })

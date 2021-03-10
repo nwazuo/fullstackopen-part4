@@ -23,6 +23,7 @@ const verifyUserToken = async (request, response, next) => {
     let token = request.token;
 
     if (!token) {
+        console.log('got in here ----->');
         return response.status(401).json({ error: 'unauthorized' })
     }
 
@@ -31,7 +32,7 @@ const verifyUserToken = async (request, response, next) => {
     let user = await User.findOne({ username: userCredentials.username });
 
     if (!user) {
-        return response.json({ error: 'user not found' }).status(400);
+        return response.json({ error: 'Unauthorized!, user not found' }).status(401);
     }
     request.userInfo = {
         user, userCredentials
@@ -66,29 +67,38 @@ blogsRouter.post('/', verifyUserToken, async (request, response) => {
     response.status(201).json(savedBlog);
 })
 
-blogsRouter.delete('/:id', async (request, response) => {
-    let decodedToken = request.token ? jwt.decode(request.token, process.env.SECRET) : false;
-
-    if (!decodedToken) {
-        return response.status(401).json({ error: 'Unauthorized' });
-    }
-
+blogsRouter.delete('/:id', verifyUserToken, async (request, response) => {
     let blog = await Blog.findById(request.params.id);
+    let { user, userCredentials } = request.userInfo;
+
 
     if (!blog) {
         return response.status(404).json({ error: 'Resource not found' });
     }
 
-    if (blog.user.toString() !== decodedToken.id.toString()) {
-        return response.status(401).json({ error: 'Unauthorized' });
+    if (blog.user.toString() !== userCredentials.id.toString()) {
+        return response.status(401).json({ error: 'Unauthorized; only a blog author can delete their blog' });
     }
 
     await Blog.findByIdAndDelete(request.params.id);
     return response.status(204).end();
 })
 
-blogsRouter.put('/:id', async (request, response) => {
+blogsRouter.put('/:id', verifyUserToken, async (request, response) => {
+    let blog = await Blog.findById(request.params.id);
+    let { user, userCredentials } = request.userInfo;
+
+
+    if (!blog) {
+        return response.status(404).json({ error: 'Resource not found' });
+    }
+
+    if (blog.user.toString() !== userCredentials.id.toString()) {
+        return response.status(401).json({ error: 'Unauthorized; only a blog author can edit their blog' });
+    }
+
     let updated = await Blog.findByIdAndUpdate(request.params.id, request.body, { new: true });
+
     response.status(400).json(updated);
 })
 
